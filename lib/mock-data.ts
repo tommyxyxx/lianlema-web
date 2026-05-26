@@ -1,4 +1,4 @@
-export const DEMO_SCHEMA_VERSION = 1;
+export const DEMO_SCHEMA_VERSION = 2;
 
 export type DemoMode = 'new' | 'ready' | 'review' | 'recovery' | 'slipping';
 
@@ -46,44 +46,154 @@ export type RecoveryDraft = {
   note: string;
 };
 
+export type WorkoutSource = 'manual' | 'text-parser' | 'imported';
+export type WorkoutStatus = 'inProgress' | 'needsReview' | 'needsRecovery' | 'completed';
+export type ExerciseType = 'strength' | 'bodyweight' | 'cardio' | 'mobility' | 'unknown';
+export type ExerciseEquipment = 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight' | 'cardio-machine' | 'unknown';
+export type WeightMode = 'total' | 'per-side' | 'bodyweight' | 'none';
+
+export type WorkoutSetV2 = {
+  weightKg?: number;
+  reps?: number;
+  durationSec?: number;
+  distanceKm?: number;
+  rpe?: number;
+  raw?: {
+    weight?: string;
+    reps?: string;
+    duration?: string;
+    distance?: string;
+  };
+};
+
+export type ExerciseEntryV2 = {
+  id: string;
+  name: string;
+  rawName?: string;
+  type: ExerciseType;
+  equipment?: ExerciseEquipment;
+  weightMode?: WeightMode;
+  confidence?: number;
+  missingFields?: Array<'weight' | 'reps' | 'sets' | 'duration' | 'distance'>;
+  note?: string;
+  savedAt: string;
+  sets: WorkoutSetV2[];
+};
+
+export type ReviewEntryV2 = {
+  workoutStartedAt: string;
+  workoutEndedAt: string;
+  postWeightKg?: number;
+  intensity?: number;
+  fatigue?: number;
+  completion?: number;
+  durationMin?: number;
+  avgHr?: number;
+  maxHr?: number;
+  kcal?: number;
+  note?: string;
+  savedAt: string;
+};
+
+export type RecoveryEntryV2 = {
+  morningWeightKg?: number;
+  sleep?: number;
+  energy?: number;
+  functionFeel?: number;
+  sorenessLevel?: number;
+  sorenessAreas?: string[];
+  note?: string;
+  savedAt: string;
+};
+
+export type WorkoutSessionV2 = {
+  id: string;
+  source: WorkoutSource;
+  status: WorkoutStatus;
+  title: string;
+  focus?: string;
+  note?: string;
+  startedAt: string;
+  endedAt?: string;
+  lastSetAt?: string;
+  savedAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  bodyWeightBeforeKg?: number;
+  bodyWeightAfterKg?: number;
+  exercises: ExerciseEntryV2[];
+  review?: ReviewEntryV2;
+  recovery?: RecoveryEntryV2;
+};
+
+export type WorkoutDraftV2 = {
+  id: string;
+  inputText?: string;
+  parsedExercises: ExerciseEntryV2[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BodySnapshotV1 = {
+  id: string;
+  date: string;
+  source: 'manual' | 'screenshot' | 'apple_watch' | 'garmin' | 'huawei' | 'keep' | 'strava' | 'unknown';
+  metrics: {
+    weightKg?: number;
+    bodyFatPct?: number;
+    sleepMinutes?: number;
+    restingHeartRate?: number;
+    averageHeartRate?: number;
+    maxHeartRate?: number;
+    hrvMs?: number;
+    steps?: number;
+    activeCalories?: number;
+    totalCalories?: number;
+    vo2max?: number;
+    recoveryScore?: number;
+    stressScore?: number;
+  };
+  confirmedByUser: boolean;
+  linkedWorkoutSessionIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserSettingsV1 = {
+  weeklyWorkoutGoal: number;
+  weekStartsOn: 0 | 1;
+  weightUnit: 'kg' | 'lb';
+};
+
 export type DemoState = {
   schemaVersion: typeof DEMO_SCHEMA_VERSION;
   mode: DemoMode;
+  appMode: DemoMode;
+  currentWorkoutId?: string;
+  currentDraft?: WorkoutDraftV2 | null;
+  workoutSessions: WorkoutSessionV2[];
+  bodySnapshots: BodySnapshotV1[];
+  settings: UserSettingsV1;
+  meta: {
+    createdAt: string;
+    updatedAt: string;
+    migratedFrom?: number;
+  };
   workout: WorkoutDraft;
   review: ReviewDraft;
   recovery: RecoveryDraft;
 };
 
-const now = '2026-03-31T19:42:00+08:00';
-const yesterday = '2026-03-30T19:42:00+08:00';
-const fourDaysAgo = '2026-03-27T18:10:00+08:00';
-
 export const sorenessOptions = ['胸', '背', '肩', '腿', '臀', '二头', '三头', '核心'];
 
-export const trendData = {
-  workoutCount7d: [0, 1, 0, 1, 0, 1, 0],
-  weight14d: [80.1, 79.8, 79.9, 79.6, 79.7, 79.5, 79.4],
-  recovery7d: [2, 3, 3, 4, 3, 4, 4],
-};
-
-function createExercise(id: string, name: string, sets: WorkoutSet[], note = '', savedAt?: string): Exercise {
-  return { id, name, note, savedAt, sets };
-}
-
-export function emptyWorkout(): WorkoutDraft {
+export function emptyWorkout(startedAt = new Date().toISOString()): WorkoutDraft {
   return {
-    theme: '胸肩',
-    focus: '今天先做一版顺手的记录，不追求很全。',
+    theme: '',
+    focus: '',
     bodyWeight: '',
     note: '',
-    startedAt: now,
-    exercises: [
-      createExercise('ex-1', '平板卧推', [
-        { weight: '60', reps: '10' },
-        { weight: '65', reps: '8' },
-      ], '', now),
-      createExercise('ex-2', '哑铃肩推', [{ weight: '20', reps: '10' }], '', now),
-    ],
+    startedAt,
+    exercises: [],
   };
 }
 
@@ -93,10 +203,10 @@ export function emptyReview(): ReviewDraft {
     intensity: 4,
     fatigue: 3,
     completion: 4,
-    durationMin: '62',
-    avgHr: '132',
-    maxHr: '168',
-    kcal: '418',
+    durationMin: '',
+    avgHr: '',
+    maxHr: '',
+    kcal: '',
     note: '',
   };
 }
@@ -108,179 +218,31 @@ export function emptyRecovery(): RecoveryDraft {
     energy: 3,
     functionFeel: 3,
     sorenessLevel: 3,
-    sorenessAreas: ['胸', '肩'],
+    sorenessAreas: [],
     note: '',
   };
 }
 
-export function createScenario(mode: DemoMode): DemoState {
-  if (mode === 'new') {
-    return {
-      schemaVersion: DEMO_SCHEMA_VERSION,
-      mode,
-      workout: emptyWorkout(),
-      review: emptyReview(),
-      recovery: emptyRecovery(),
-    };
-  }
-
-  if (mode === 'review') {
-    return {
-      schemaVersion: DEMO_SCHEMA_VERSION,
-      mode,
-      workout: {
-        theme: '胸肩',
-        focus: '主动作稳一点，别追 PR。',
-        bodyWeight: '79.6',
-        note: '第三组开始掉速，但整体完成度还可以。',
-        startedAt: now,
-        exercises: [
-          createExercise('ex-1', '平板卧推', [
-            { weight: '60', reps: '10' },
-            { weight: '65', reps: '8' },
-            { weight: '65', reps: '7' },
-          ], '第三组明显慢了', now),
-          createExercise('ex-2', '上斜哑铃卧推', [
-            { weight: '24', reps: '10' },
-            { weight: '24', reps: '9' },
-          ], '', now),
-          createExercise('ex-3', '哑铃肩推', [
-            { weight: '20', reps: '10' },
-            { weight: '20', reps: '8' },
-          ], '左肩略紧', now),
-        ],
-      },
-      review: emptyReview(),
-      recovery: emptyRecovery(),
-    };
-  }
-
-  if (mode === 'recovery') {
-    return {
-      schemaVersion: DEMO_SCHEMA_VERSION,
-      mode,
-      workout: {
-        theme: '胸肩',
-        focus: '推进但别练满。',
-        bodyWeight: '79.4',
-        note: '这次动作完成度不错。',
-        startedAt: yesterday,
-        exercises: [
-          createExercise('ex-1', '平板卧推', [
-            { weight: '60', reps: '10' },
-            { weight: '65', reps: '8' },
-            { weight: '65', reps: '8' },
-          ], '', yesterday),
-          createExercise('ex-2', '双杠臂屈伸', [
-            { weight: '自重', reps: '12' },
-            { weight: '自重', reps: '10' },
-          ], '', yesterday),
-        ],
-      },
-      review: {
-        postWeight: '79.4',
-        intensity: 4,
-        fatigue: 4,
-        completion: 4,
-        durationMin: '64',
-        avgHr: '136',
-        maxHr: '171',
-        kcal: '436',
-        note: '刺激够了，但别只看表，明天先看恢复。',
-      },
-      recovery: emptyRecovery(),
-    };
-  }
-
-  if (mode === 'slipping') {
-    return {
-      schemaVersion: DEMO_SCHEMA_VERSION,
-      mode,
-      workout: {
-        theme: '下肢',
-        focus: '把节奏接回来，别一上来顶强度。',
-        bodyWeight: '79.8',
-        note: '那次练完疲劳感偏高。',
-        startedAt: fourDaysAgo,
-        exercises: [
-          createExercise('ex-1', '深蹲', [
-            { weight: '80', reps: '8' },
-            { weight: '80', reps: '8' },
-            { weight: '82.5', reps: '6' },
-          ], '', fourDaysAgo),
-          createExercise('ex-2', '罗马尼亚硬拉', [
-            { weight: '70', reps: '10' },
-            { weight: '70', reps: '10' },
-          ], '', fourDaysAgo),
-        ],
-      },
-      review: {
-        postWeight: '79.8',
-        intensity: 5,
-        fatigue: 5,
-        completion: 4,
-        durationMin: '68',
-        avgHr: '138',
-        maxHr: '176',
-        kcal: '462',
-        note: '练透了，但疲劳也有点高。',
-      },
-      recovery: {
-        morningWeight: '79.2',
-        sleep: 2,
-        energy: 3,
-        functionFeel: 2,
-        sorenessLevel: 4,
-        sorenessAreas: ['腿', '臀'],
-        note: '睡得一般，楼梯发力有点重。',
-      },
-    };
-  }
-
+export function createEmptyAppState(createdAt = new Date().toISOString()): DemoState {
   return {
     schemaVersion: DEMO_SCHEMA_VERSION,
-    mode: 'ready',
-    workout: {
-      theme: '胸肩',
-      focus: '今天可以正常推进。',
-      bodyWeight: '79.3',
-      note: '完成度不错，状态稳定。',
-      startedAt: yesterday,
-      exercises: [
-        createExercise('ex-1', '平板卧推', [
-          { weight: '60', reps: '10' },
-          { weight: '65', reps: '8' },
-          { weight: '65', reps: '8' },
-        ], '', yesterday),
-        createExercise('ex-2', '上斜哑铃卧推', [
-          { weight: '24', reps: '10' },
-          { weight: '24', reps: '9' },
-        ], '', yesterday),
-        createExercise('ex-3', '绳索侧平举', [
-          { weight: '7.5', reps: '15' },
-          { weight: '7.5', reps: '13' },
-        ], '', yesterday),
-      ],
+    mode: 'new',
+    appMode: 'new',
+    currentWorkoutId: undefined,
+    currentDraft: null,
+    workoutSessions: [],
+    bodySnapshots: [],
+    settings: {
+      weeklyWorkoutGoal: 3,
+      weekStartsOn: 1,
+      weightUnit: 'kg',
     },
-    review: {
-      postWeight: '79.3',
-      intensity: 4,
-      fatigue: 3,
-      completion: 4,
-      durationMin: '61',
-      avgHr: '133',
-      maxHr: '169',
-      kcal: '422',
-      note: '刺激够了，但没有练乱。',
+    meta: {
+      createdAt,
+      updatedAt: createdAt,
     },
-    recovery: {
-      morningWeight: '79.0',
-      sleep: 4,
-      energy: 4,
-      functionFeel: 4,
-      sorenessLevel: 3,
-      sorenessAreas: ['胸', '肩'],
-      note: '酸痛在预期内，精神状态还行。',
-    },
+    workout: emptyWorkout(createdAt),
+    review: emptyReview(),
+    recovery: emptyRecovery(),
   };
 }

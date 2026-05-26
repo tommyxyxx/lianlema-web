@@ -15,3 +15,13 @@ pnpm-debug.log*
 !.env.example
 tsconfig.tsbuildinfo
 .openclaw/
+
+# Local OpenClaw / assistant workspace files (do not publish)
+AGENTS.md
+BOOTSTRAP.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+artifacts/

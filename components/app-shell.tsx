@@ -6,10 +6,9 @@ import { ReactNode } from 'react';
 import { cn } from '@/lib/helpers';
 
 const navItems = [
-  { href: '/', label: '首页', shortLabel: '首页', icon: '⌂' },
+  { href: '/', label: '今日页', shortLabel: '今日', icon: '⌂' },
   { href: '/train', label: '记录训练', shortLabel: '记录', icon: '✍️' },
   { href: '/review', label: '训练库', shortLabel: '训练库', icon: '▦' },
-  { href: '/recovery', label: '恢复状态', shortLabel: '恢复', icon: '♡' },
   { href: '/trends', label: '数据趋势', shortLabel: '趋势', icon: '⌁' },
 ];
 
@@ -34,7 +33,7 @@ export function AppShell({ children, contentSize = 'default' }: AppShellProps) {
     <div className="m1-app-shell min-h-screen w-full bg-[radial-gradient(circle_at_82%_8%,rgba(45,212,191,0.28),transparent_30%),radial-gradient(circle_at_16%_18%,rgba(236,253,245,0.92),transparent_32%),linear-gradient(135deg,#f7fffb_0%,#e9faf4_42%,#d8f5ef_100%)] text-teal-950">
       <aside className="fixed bottom-6 left-6 top-6 z-40 hidden w-[230px] flex-col rounded-[32px] border border-white/70 bg-white/82 p-4 shadow-[0_24px_80px_rgba(13,94,88,0.16)] backdrop-blur-2xl lg:flex">
         <Link href="/" className="flex items-center gap-3 rounded-[24px] px-2 py-2">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-xl font-black text-white shadow-lg shadow-teal-700/20">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-xl font-black !text-white shadow-lg shadow-teal-700/20">
             练
           </span>
           <span>
@@ -53,14 +52,14 @@ export function AppShell({ children, contentSize = 'default' }: AppShellProps) {
                 className={cn(
                   'group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition duration-200',
                   active
-                    ? 'll-active-nav bg-teal-950 text-white shadow-xl shadow-teal-950/18'
+                    ? 'll-active-nav bg-teal-950 !text-white shadow-xl shadow-teal-950/18'
                     : 'text-teal-950/62 hover:bg-emerald-50 hover:text-teal-950',
                 )}
               >
                 <span
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-xl text-xs transition',
-                    active ? 'bg-white/12 text-white' : 'bg-teal-50 text-teal-800/65 group-hover:bg-white',
+                    active ? 'bg-white/12 !text-white' : 'bg-teal-50 text-teal-800/65 group-hover:bg-white',
                   )}
                 >
                   {item.icon}
@@ -77,7 +76,7 @@ export function AppShell({ children, contentSize = 'default' }: AppShellProps) {
           </p>
           <p className="mt-3 text-sm font-bold text-teal-950">{isTrainPage ? '输入一句话就行' : '先把训练记下来'}</p>
           <p className="mt-2 text-xs leading-5 text-teal-900/58">
-            {isTrainPage ? '先做可靠的动作别名与组数重量识别，再考虑更复杂的智能化。' : '输入一句话，系统自动识别动作、组数和重量；训练后再补回顾和恢复感。'}
+            {isTrainPage ? '先做可靠的动作别名与组数重量识别，再考虑更复杂的智能化。' : '输入一句话，系统自动识别动作、组数和重量；训练后补本次回顾。'}
           </p>
         </div>
       </aside>
@@ -86,7 +85,7 @@ export function AppShell({ children, contentSize = 'default' }: AppShellProps) {
         <header className="sticky top-0 z-30 border-b border-white/55 bg-white/74 px-4 py-3 shadow-sm shadow-teal-900/5 backdrop-blur-xl lg:hidden">
           <div className="mx-auto flex max-w-[760px] items-center justify-between gap-3">
             <Link href="/" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-base font-black text-white">练</span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-base font-black !text-white">练</span>
               <span>
                 <span className="block text-base font-black text-teal-950">练了吗</span>
                 <span className="block text-[11px] font-semibold text-teal-700/70">Training Habit OS</span>
@@ -107,7 +106,7 @@ export function AppShell({ children, contentSize = 'default' }: AppShellProps) {
       </div>
 
       <nav className="fixed bottom-3 left-3 right-3 z-50 rounded-[28px] border border-white/75 bg-white/88 px-2 py-2 shadow-[0_18px_60px_rgba(13,94,88,0.20)] backdrop-blur-2xl lg:hidden">
-        <div className="grid grid-cols-5 gap-1 text-center text-[11px] font-semibold">
+        <div className="grid grid-cols-4 gap-1 text-center text-[11px] font-semibold">
           {navItems.map((item) => {
             const active = isActivePath(pathname, item.href);
             return (
@@ -116,7 +115,7 @@ export function AppShell({ children, contentSize = 'default' }: AppShellProps) {
                 href={item.href}
                 className={cn(
                   'flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl px-1 transition',
-                  active ? 'll-active-nav bg-teal-950 text-white shadow-lg shadow-teal-950/18' : 'text-teal-950/58 hover:bg-emerald-50 hover:text-teal-950',
+                  active ? 'll-active-nav bg-teal-950 !text-white shadow-lg shadow-teal-950/18' : 'text-teal-950/58 hover:bg-emerald-50 hover:text-teal-950',
                 )}
               >
                 <span className="text-sm leading-none">{item.icon}</span>
@@ -164,9 +163,6 @@ export function SectionCard({
 export function PageIntro({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <header className="mb-5 space-y-2 lg:mb-6">
-      <p className="inline-flex rounded-full border border-emerald-100 bg-white/72 px-3 py-1 text-xs font-black tracking-tight text-teal-700 shadow-sm shadow-teal-900/5">
-        🌿 Web v1.1 视觉方向 · 浅色 SaaS Dashboard
-      </p>
       <h1 className="text-[30px] font-black leading-tight tracking-[-0.06em] text-teal-950 sm:text-[40px]">{title}</h1>
       <p className="max-w-[62ch] text-sm leading-6 text-teal-900/62 sm:text-base">{subtitle}</p>
     </header>

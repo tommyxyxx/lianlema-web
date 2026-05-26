@@ -1,13 +1,14 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { AppShell } from '@/components/app-shell';
 import { useDemo } from '@/components/demo-store';
 import { formatParsedNumber, parseExerciseInput, ParsedExercise } from '@/lib/exercise-parser';
 import { Exercise } from '@/lib/mock-data';
 
 const exampleChips = ['卧推 60kg 8×4', '深蹲 80kg 5×5', '跑步 30分钟', '引体向上 8×3', '今天恢复训练'];
-const defaultInput = '卧推 60kg 8次 4组\n上斜哑铃卧推 22.5kg 10次 3组\n绳索下压 35kg 12次 3组';
+const defaultInput = '';
 const MOBILE_SAVED_PREVIEW_LIMIT = 4;
 
 type ParsedDraft = {
@@ -164,18 +165,24 @@ function getExerciseVolume(exercise: Exercise) {
 }
 
 export function TrainScreen() {
-  const { state, saveParsedWorkout, removeExercise, restoreExercise } = useDemo();
+  const { state, hasLoadedStorage, updateWorkoutField, saveParsedWorkout, endCurrentWorkout, startNewWorkout, removeExercise, restoreExercise } = useDemo();
   const [rawText, setRawText] = useState(defaultInput);
   const [drafts, setDrafts] = useState<ParsedDraft[]>([]);
   const [parseMessage, setParseMessage] = useState('先输入一条或多条训练内容，再点击解析。');
   const [saveMessage, setSaveMessage] = useState('');
+  const [sessionMessage, setSessionMessage] = useState('');
+  const [startWorkoutMessage, setStartWorkoutMessage] = useState('');
   const [hasParsed, setHasParsed] = useState(false);
   const [isSavedListExpanded, setIsSavedListExpanded] = useState(false);
   const [deletedExercise, setDeletedExercise] = useState<{ exercise: Exercise; index: number } | null>(null);
   const pendingActionsRef = useRef<HTMLElement | null>(null);
+  const hasMarkedWorkoutStartRef = useRef(false);
 
   const recognizedDrafts = drafts.filter((item) => item.ok || item.name.trim());
-  const savedExercises = state.workout.exercises;
+  const currentSession = state.currentWorkoutId ? state.workoutSessions.find((session) => session.id === state.currentWorkoutId) : undefined;
+  const hasInProgressSession = currentSession?.status === 'inProgress';
+  const savedExercises = hasInProgressSession ? state.workout.exercises : [];
+  const canStartNewWorkout = !hasInProgressSession || savedExercises.length === 0;
   const shouldCollapseSavedOnMobile = savedExercises.length > MOBILE_SAVED_PREVIEW_LIMIT;
   const visibleMobileSavedExercises = isSavedListExpanded ? savedExercises : savedExercises.slice(0, MOBILE_SAVED_PREVIEW_LIMIT);
   const hiddenSavedCount = Math.max(savedExercises.length - MOBILE_SAVED_PREVIEW_LIMIT, 0);
@@ -184,6 +191,15 @@ export function TrainScreen() {
   const totalSets = recognizedDrafts.reduce((sum, item) => sum + toPositiveInteger(item.sets, item.sets ? 1 : 0), 0);
   const completeCount = recognizedDrafts.filter((item) => getMissingAfterEdit(item).length === 0).length;
   const duplicateCount = recognizedDrafts.filter((item) => hasDuplicateSavedExercise(item, savedExercises)).length;
+
+  useEffect(() => {
+    if (hasMarkedWorkoutStartRef.current || !hasLoadedStorage) return;
+    if (state.currentWorkoutId || state.workout.exercises.length) return;
+
+    hasMarkedWorkoutStartRef.current = true;
+    updateWorkoutField('startedAt', new Date().toISOString());
+  }, [hasLoadedStorage, state.currentWorkoutId, state.workout.exercises.length, updateWorkoutField]);
+
   const averageConfidence = useMemo(() => {
     if (!drafts.length) return '等待解析';
     if (drafts.some((item) => item.confidence === '低')) return '含低置信';
@@ -304,6 +320,8 @@ export function TrainScreen() {
     }
 
     setDeletedExercise(null);
+    setSessionMessage('');
+    setStartWorkoutMessage('');
     saveParsedWorkout(
       recognizedDrafts.map((item) => ({
         name: item.name.trim(),
@@ -324,8 +342,39 @@ export function TrainScreen() {
     );
     setDrafts([]);
     setRawText('');
-    setSaveMessage(`已追加保存 ${recognizedDrafts.length} 个动作。今日已保存列表已更新，之前记录不会被覆盖。`);
+    setSaveMessage(`已保存到本次训练 ${recognizedDrafts.length} 个动作。本次训练仍在进行中，结束后再去回顾。`);
     setIsSavedListExpanded(false);
+  }
+
+  function handleEndWorkout() {
+    if (!savedExercises.length) {
+      setSaveMessage('');
+      setSessionMessage('本轮训练还没有保存动作。请先保存至少一个动作后再结束训练。');
+      return;
+    }
+
+    endCurrentWorkout();
+    setSaveMessage('');
+    setStartWorkoutMessage('');
+    setSessionMessage('本次训练已结束，已进入待回顾状态。');
+  }
+
+  function handleStartNewWorkout() {
+    if (hasInProgressSession && !savedExercises.length) {
+      setSaveMessage('');
+      setSessionMessage('');
+      setStartWorkoutMessage('当前训练还没有保存动作。请先记录并保存动作，或继续在本轮训练里补充。');
+      return;
+    }
+
+    setDrafts([]);
+    setRawText('');
+    setDeletedExercise(null);
+    setIsSavedListExpanded(false);
+    startNewWorkout();
+    setSaveMessage('');
+    setSessionMessage('');
+    setStartWorkoutMessage('已开启新的训练。请先记录动作，保存后再结束本次训练。');
   }
 
   return (
@@ -333,10 +382,7 @@ export function TrainScreen() {
       <div className="max-w-full space-y-4 overflow-x-hidden pb-20 text-teal-950 sm:space-y-5 sm:pb-0">
         <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-emerald-200/70 bg-white/70 px-3 py-2 text-[13px] font-black text-emerald-700 shadow-sm shadow-teal-900/5">
-              ✍ 训练记录页 · 文本输入优先
-            </p>
-            <h1 className="mt-3 max-w-[680px] text-[31px] font-black leading-[1.08] tracking-[-0.06em] text-teal-950 sm:mt-4 sm:text-[42px]">
+            <h1 className="max-w-[680px] text-[31px] font-black leading-[1.08] tracking-[-0.06em] text-teal-950 sm:text-[42px]">
               把刚练的内容贴进来
             </h1>
             <p className="mt-2 max-w-[720px] text-sm leading-6 text-teal-900/72 sm:text-[15px]">
@@ -344,9 +390,21 @@ export function TrainScreen() {
             </p>
           </div>
 
-          <div className="w-full rounded-full border border-white/90 bg-white/62 px-4 py-2 shadow-[0_10px_28px_rgba(21,74,61,0.06)] backdrop-blur-xl sm:w-[180px] sm:rounded-[22px] sm:bg-white/78 sm:px-4 sm:py-3 lg:mt-2">
-            <p className="text-sm font-black tracking-[-0.02em] text-teal-950 sm:text-[17px]">无需登录</p>
-            <p className="hidden text-xs leading-5 text-teal-900/64 sm:mt-1 sm:block">v1.1 先走本地数据闭环</p>
+          <div className="w-full rounded-[24px] border border-white/90 bg-white/78 p-3 shadow-[0_10px_28px_rgba(21,74,61,0.06)] backdrop-blur-xl sm:w-[240px] lg:mt-2">
+            <button
+              type="button"
+              onClick={handleStartNewWorkout}
+              disabled={!canStartNewWorkout}
+              className="h-12 w-full rounded-2xl bg-teal-950 px-4 text-sm font-black !text-white shadow-[0_16px_30px_rgba(15,23,42,0.16)] disabled:cursor-not-allowed disabled:bg-teal-950/30 disabled:!text-white/70"
+            >
+              开启新的训练
+            </button>
+            <p className="mt-2 text-xs font-semibold leading-5 text-teal-900/58">
+              {canStartNewWorkout ? '开始第二场训练时先点这里。' : '先结束当前 session，再开启新的训练。'}
+            </p>
+            {startWorkoutMessage ? (
+              <p className="mt-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-800">{startWorkoutMessage}</p>
+            ) : null}
           </div>
         </header>
 
@@ -403,7 +461,7 @@ export function TrainScreen() {
                   <button
                     type="button"
                     onClick={handleParse}
-                    className="h-[50px] rounded-[18px] bg-emerald-500 px-5 text-base font-black text-white shadow-[0_18px_34px_rgba(18,184,134,0.28)] sm:h-[54px] sm:px-6"
+                    className="h-[50px] rounded-[18px] bg-emerald-500 px-5 text-base font-black !text-white shadow-[0_18px_34px_rgba(18,184,134,0.28)] sm:h-[54px] sm:px-6"
                   >
                     解析训练
                   </button>
@@ -565,13 +623,13 @@ export function TrainScreen() {
                 )}
               </div>
 
-              <div className="sticky bottom-[96px] z-20 mt-4 flex flex-col gap-3 rounded-[26px] bg-teal-950 p-4 text-white shadow-[0_22px_60px_rgba(21,74,61,0.18)] sm:flex-row sm:items-center sm:justify-between lg:static">
+              <div className="sticky bottom-[96px] z-20 mt-4 flex flex-col gap-3 rounded-[26px] bg-teal-950 p-4 !text-white shadow-[0_22px_60px_rgba(21,74,61,0.18)] sm:flex-row sm:items-center sm:justify-between lg:static">
                 <div>
                   <p className="text-lg font-black tracking-[-0.03em] !text-white">全部追加保存 {recognizedDrafts.length || 0} 个动作</p>
-                  <p className="mt-1 text-xs !text-white/76">只保存当前待保存列表；不会覆盖今日已保存动作</p>
+                  <p className="mt-1 text-xs !text-white/76">只保存当前待保存列表；本次训练仍会保持进行中</p>
                 </div>
                 <button type="button" onClick={handleSave} className="h-12 shrink-0 rounded-2xl bg-white px-5 text-sm font-black text-teal-950 sm:min-w-[112px]">
-                  全局保存
+                  保存动作
                 </button>
               </div>
               {saveMessage ? <p className="mt-3 rounded-[18px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-emerald-800">{saveMessage}</p> : null}
@@ -593,7 +651,7 @@ export function TrainScreen() {
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-black tracking-[-0.03em] text-teal-950">今日已保存动作</h2>
-                  <p className="mt-1 text-[12px] font-semibold leading-5 text-teal-900/60">每次全局保存都会追加到这里，可查看或删除。</p>
+                  <p className="mt-1 text-[12px] font-semibold leading-5 text-teal-900/60">每次保存动作都会追加到这里，可查看或删除。</p>
                 </div>
                 <span className="shrink-0 text-sm font-black text-emerald-700">最近 {lastSavedAt}</span>
               </div>
@@ -709,10 +767,48 @@ export function TrainScreen() {
                   </>
                 ) : (
                   <div className="rounded-[22px] border border-dashed border-emerald-200 bg-[#f7fbf9] px-4 py-8 text-center text-sm font-bold leading-6 text-teal-900/62">
-                    今天还没有保存动作。解析并全局保存后会出现在这里。
+                    今天还没有保存动作。解析并保存动作后会出现在这里。
                   </div>
                 )}
               </div>
+            </section>
+
+            <section className="rounded-[28px] border border-white/95 bg-white/86 p-4 shadow-[0_22px_60px_rgba(21,74,61,0.10)] backdrop-blur-xl sm:rounded-[32px] sm:p-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black tracking-[-0.03em] text-teal-950">本次训练</h2>
+                  <p className="mt-1 text-[12px] font-semibold leading-5 text-teal-900/60">保存动作只是追加记录；点击结束后才会进入回顾，并允许再开新的训练。</p>
+                </div>
+                <span className="shrink-0 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[12px] font-black text-emerald-700">
+                  {hasInProgressSession ? '进行中' : currentSession?.status === 'needsReview' ? '待回顾' : '未开始'}
+                </span>
+              </div>
+
+              {sessionMessage ? (
+                <p className="mb-3 rounded-[18px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-emerald-800">{sessionMessage}</p>
+              ) : null}
+
+              {currentSession?.status === 'needsReview' ? (
+                <Link href="/review" className="block rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-3 text-center text-sm font-black text-emerald-700">
+                  去完成本次训练回顾
+                </Link>
+              ) : (
+                <div className="grid gap-3">
+                  <button
+                    type="button"
+                    onClick={handleEndWorkout}
+                    disabled={!hasInProgressSession}
+                    className={`min-h-12 rounded-2xl px-5 py-3 text-sm font-black !text-white shadow-[0_18px_34px_rgba(15,23,42,0.16)] disabled:cursor-not-allowed disabled:bg-teal-950/30 ${savedExercises.length ? 'bg-teal-950' : 'bg-teal-950/30'}`}
+                  >
+                    结束本次训练
+                  </button>
+                </div>
+              )}
+              {!canStartNewWorkout ? (
+                <p className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
+                  当前训练已有已保存动作。请先点击「结束本次训练」关闭 session，再开启新的训练。
+                </p>
+              ) : null}
             </section>
           </aside>
         </section>

@@ -1,4 +1,5 @@
 # 练了吗 Web v1 原型
+<img width="2088" height="1330" alt="image" src="https://github.com/user-attachments/assets/3277e5a9-26c6-4cbe-8fab-f714e4898db8" />
 
 一个手机宽度优先的 Next.js 原型，用来演示「练了吗」最核心的训练闭环：
 
